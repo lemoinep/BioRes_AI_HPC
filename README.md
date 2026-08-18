@@ -1,6 +1,6 @@
 # BioRes-AI/HPC
 
-
+*From Microbial Ecosystem Resilience to Adaptive AI/HPC Architectures: A Framework for Safe and Verified Functional Recovery*
 
 [![Version](https://img.shields.io/badge/version-0.1-green.svg)](https://github.com/lemoinep/BioRes_AI_HPC)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
