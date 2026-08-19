@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.12.2)  17 AUG 2026 15:48
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (MiKTeX 25.4) (preloaded format=pdflatex 2025.12.2)  19 AUG 2026 13:44
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -420,48 +420,28 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 101
 (C:\Users\lemoi\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-Overfull \hbox (84.29501pt too wide) detected at line 103
-[][][][] \OT1/cmr/m/n/10 = [] \OMS/cmsy/m/n/10 ^ []\OML/cmm/m/it/10 :
- []
-
-[2]
-Overfull \hbox (17.4049pt too wide) detected at line 146
-[][][]\OMS/cmsy/m/n/10 F \OT1/cmr/m/n/10 = \OMS/cmsy/m/n/10 f\OML/cmm/m/it/10 f
-[]; f[]; f[]; f[]; f[]; f[]\OMS/cmsy/m/n/10 g\OML/cmm/m/it/10 :
- []
-
-[3]
-Overfull \hbox (36.68262pt too wide) detected at line 173
-[][][][] \OMS/cmsy/m/n/10 ! [] ! [] ! [] ! [] ! []\OML/cmm/m/it/10 :
- []
-
-[4]
-Overfull \hbox (8.99937pt too wide) detected at line 248
+[2] [3] [4]
+Overfull \hbox (8.99937pt too wide) detected at line 292
 [][][]\OML/cmm/m/it/10 C[] \OT1/cmr/m/n/10 = []
  []
 
 
-Underfull \hbox (badness 2884) in paragraph at lines 285--286
+Underfull \hbox (badness 2884) in paragraph at lines 329--330
 []\OT1/ptm/m/n/10 Data sce-nar-ios in-clude miss-ing in-put par-ti-tions, cor-
  []
 
 
-Underfull \hbox (badness 2269) in paragraph at lines 285--286
+Underfull \hbox (badness 2269) in paragraph at lines 329--330
 \OT1/ptm/m/n/10 rupted data records, schema mis-matches, de-layed in-put
  []
 
 
-Underfull \hbox (badness 2073) in paragraph at lines 287--288
+Underfull \hbox (badness 2073) in paragraph at lines 331--332
 []\OT1/ptm/m/n/10 AI de-ci-sion sce-nar-ios in-clude low-confidence out-puts,
  []
 
 [5]
-Overfull \hbox (64.58305pt too wide) detected at line 341
-[][][][] []  [] \OML/cmm/m/it/10 T[]; O[]; []:
- []
-
-
-Underfull \hbox (badness 2165) in paragraph at lines 351--352
+Underfull \hbox (badness 2165) in paragraph at lines 401--402
 []\OT1/ptm/m/n/10 This pa-per in-tro-duced BioRes-AI/HPC, a bio-inspired
  []
 
@@ -486,13 +466,13 @@ d.
 (rerunfilecheck)             Checksum: 5D8148F8346061115DD2EBE1B10823FB;7791.
  ) 
 Here is how much of TeX's memory you used:
- 9952 strings out of 467871
- 156281 string characters out of 5418376
- 581813 words of memory out of 5000000
- 38655 multiletter control sequences out of 15000+600000
+ 9961 strings out of 467871
+ 156471 string characters out of 5418376
+ 582047 words of memory out of 5000000
+ 38664 multiletter control sequences out of 15000+600000
  667476 words of font info for 115 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 75i,10n,79p,1784b,541s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,17n,79p,1784b,541s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/lemoi/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/
 cmex10.pfb><C:/Users/lemoi/AppData/Local/Programs/MiKTeX/fonts/type1/public/ams
 fonts/cm/cmmi10.pfb><C:/Users/lemoi/AppData/Local/Programs/MiKTeX/fonts/type1/p
@@ -506,7 +486,7 @@ ppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Users/lemoi/A
 ppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmbi8a.pfb><C:/Users/lemoi/
 AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Users/lemoi/
 AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
-Output written on biores_ai_hpc_ieee_draft.pdf (6 pages, 213272 bytes).
+Output written on biores_ai_hpc_ieee_draft.pdf (6 pages, 213891 bytes).
 PDF statistics:
  333 PDF objects out of 1000 (max. 8388607)
  82 named destinations out of 1000 (max. 500000)

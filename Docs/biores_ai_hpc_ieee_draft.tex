@@ -99,17 +99,35 @@ Consequently, operational recovery does not necessarily imply functional recover
 This paper defines \emph{safe and verified recovery} as the restoration of an essential system function after disruption, accompanied by verification that the recovered system state and resulting outputs satisfy predefined integrity, correctness, quality, and safety constraints.
 
 \begin{equation}
-\text{Safe and Verified Recovery} = \text{Functional Restoration} \land \text{Post-Recovery Verification}.
+\begin{split}
+\text{Safe and Verified Recovery}
+&= \text{Functional Restoration} \\
+&\quad \land \text{Post-Recovery Verification}.
+\end{split}
+\label{eq:safe-verified-recovery}
 \end{equation}
+
 
 The first term concerns whether the essential service or computational workflow is operational again. The second term concerns whether the recovered state and outputs are trustworthy.
 
 The safe recovery time is defined as:
 \begin{equation}
-T_{\mathrm{SR}} = T_{\mathrm{detect}} + T_{\mathrm{isolate}} + T_{\mathrm{reconfigure}} + T_{\mathrm{restore}} + T_{\mathrm{verify}}.
+\begin{aligned}
+T_{\mathrm{SR}}
+&= T_{\mathrm{det}}
+ + T_{\mathrm{iso}}
+ + T_{\mathrm{reconf}} \\
+&\quad + T_{\mathrm{rest}}
+ + T_{\mathrm{ver}}.
+\end{aligned}
+\label{eq:safe-recovery-time}
 \end{equation}
 
-Here, $T_{\mathrm{detect}}$ is the time required to identify the incident; $T_{\mathrm{isolate}}$ is the time required to contain its impact; $T_{\mathrm{reconfigure}}$ is the time required to select and apply a response policy; $T_{\mathrm{restore}}$ is the time required to restore execution or service; and $T_{\mathrm{verify}}$ is the time required to validate recovered state and outputs.
+Here, $T_{\mathrm{det}}$ is the detection time,
+$T_{\mathrm{iso}}$ is the isolation and containment time,
+$T_{\mathrm{reconf}}$ is the reconfiguration time,
+$T_{\mathrm{rest}}$ is the restoration time, and
+$T_{\mathrm{ver}}$ is the post-recovery verification time.
 
 A system should not be considered fully recovered if $T_{\mathrm{verify}}$ has not been completed successfully.
 
@@ -141,9 +159,26 @@ Data signals include missing-value rate, schema conformance, input completeness,
 \subsection{Functional Dependency Model}
 
 The framework models not only physical resources, but also the functions that must be preserved. For a generic AI/HPC workflow, the function set is represented as:
+
 \begin{equation}
-\mathcal{F} = \{f_{\mathrm{data}}, f_{\mathrm{train}}, f_{\mathrm{checkpoint}}, f_{\mathrm{inference}}, f_{\mathrm{validation}}, f_{\mathrm{orchestration}}\}.
+\begin{aligned}
+\mathcal{F} = \{
+& f_{\mathrm{data}},
+f_{\mathrm{train}},
+f_{\mathrm{ckpt}}, \\
+& f_{\mathrm{inf}},
+f_{\mathrm{val}},
+f_{\mathrm{orch}}
+\}.
+\end{aligned}
+\label{eq:function-set}
 \end{equation}
+
+where $f_{\mathrm{data}}$, $f_{\mathrm{train}}$,
+$f_{\mathrm{ckpt}}$, $f_{\mathrm{inf}}$,
+$f_{\mathrm{val}}$, and $f_{\mathrm{orch}}$ denote data ingestion and
+preparation, training, checkpointing, inference, validation, and workflow
+orchestration, respectively.
 
 Each critical function $f_i$ is represented by:
 \begin{equation}
@@ -168,8 +203,17 @@ Potential actions include isolating an unhealthy node or service, restarting fro
 The verified recovery layer evaluates whether a recovery action restored the required function and whether the resulting state is trustworthy. Verification may include checkpoint checksums and metadata validation, consistency of distributed process states, numerical residual checks, conservation-law checks for scientific simulations, model artifact validation, input-data schema validation, confidence thresholds, output constraints, and domain-specific safety conditions.
 
 The recovery process transitions through the following states:
+
 \begin{equation}
-\text{Nominal} \rightarrow \text{Detected} \rightarrow \text{Isolated} \rightarrow \text{Degraded} \rightarrow \text{Restored} \rightarrow \text{Verified}.
+\begin{aligned}
+\text{Nominal}
+&\rightarrow \text{Detected}
+\rightarrow \text{Isolated} \\
+&\rightarrow \text{Degraded}
+\rightarrow \text{Restored}
+\rightarrow \text{Verified}.
+\end{aligned}
+\label{eq:recovery-states}
 \end{equation}
 
 The system should transition to the \emph{Verified} state only when relevant integrity, correctness, and safety criteria have been satisfied.
@@ -335,9 +379,15 @@ Resilience mechanisms introduce overhead. Checkpointing consumes storage and I/O
 
 Therefore, the design problem is multi-objective:
 \begin{equation}
-\max\left(FC, C_R, \text{resource efficiency}\right)
-\quad \text{subject to} \quad
-T_{\mathrm{SR}}, O_R, \text{safety constraints}.
+\begin{aligned}
+\max \quad
+& \left(FC, C_R, \text{efficiency}\right) \\
+\text{subject to} \quad
+& T_{\mathrm{SR}} \leq T_{\mathrm{SR}}^{\max}, \\
+& O_R \leq O_R^{\max}, \\
+& \text{safety constraints are satisfied}.
+\end{aligned}
+\label{eq:multi-objective-design}
 \end{equation}
 
 The appropriate balance depends on workload criticality, acceptable risk, energy budget, hardware availability, and application-specific correctness requirements.
