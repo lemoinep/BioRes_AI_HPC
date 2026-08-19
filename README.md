@@ -72,9 +72,9 @@ The global platform state is defined as:
 
 $$
 \mathbf{X}(t) =
-\left\{
+\left\lbrace
 \mathbf{x}_v(t)
-\right\}_{v \in \mathcal{V}}.
+\right\rbrace_{v \in \mathcal{V}}.
 $$
 
 The platform is exposed to disturbances from three degradation domains:
@@ -82,16 +82,17 @@ The platform is exposed to disturbances from three degradation domains:
 $$
 \mathcal{D}
 =
-\left\{
+\lbrace
 \mathcal{D}_{\mathrm{infra}},
 \mathcal{D}_{\mathrm{data}},
 \mathcal{D}_{\mathrm{AI}}
-\right\},
+\rbrace.
 $$
 
 where $\mathcal{D}_{\mathrm{infra}}$ represents infrastructure failures,
 $\mathcal{D}_{\mathrm{data}}$ represents data perturbations, and
-$\mathcal{D}_{\mathrm{AI}}$ represents degradation of AI outputs or decision quality.
+$\mathcal{D}_{\mathrm{AI}}$ represents degradation of AI outputs or decision
+quality..
 
 
 ```mermaid
@@ -178,9 +179,11 @@ Q_k(t)
 =
 \Phi_k
 \left(
-\{\mathbf{x}_v(t)\}_{v \in \mathcal{V}_k},
+\operatorname*{collection}_{v \in \mathcal{V}_k}
+\mathbf{x}_v(t),
+\;
 \mathbf{d}(t)
-\right),
+\right).
 $$
 
 where $\Phi_k(\cdot)$ is a function-specific quality model and
@@ -191,9 +194,11 @@ The normalized functional continuity of $f_k$ is:
 $$
 C_k(t)
 =
-\frac{Q_k(t)}{Q_k^{\mathrm{nominal}}},
+\frac{Q_k(t)}
+{Q_k^{\mathrm{nominal}}}
+,
 \qquad
-0 \leq C_k(t) \leq 1,
+0 \leq C_k(t) \leq 1.
 $$
 
 where $Q_k^{\mathrm{nominal}}$ is the expected quality under nominal
