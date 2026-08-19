@@ -39,61 +39,51 @@ The broader objective is to move AI/HPC resilience beyond checkpoint/restart tow
 
 ### System Model
 
-Let the AI/HPC platform be represented as a directed dependency graph:
+Let the AI/HPC platform be represented by a directed dependency graph:
 
 $$
-\mathcal{G} = (\mathcal{V}, \mathcal{E}),
+\mathcal G = (\mathcal V, \mathcal E).
 $$
 
-where $\mathcal{V}$ is the set of system components and $\mathcal{E}$ is the set of dependency, communication, control, or data-flow edges.
+Here, $\mathcal V$ is the set of system components and $\mathcal E$ is the
+set of dependency, communication, control, and data-flow edges.
 
-A component $v \in \mathcal{V}$ may represent a compute node, GPU, network link, storage service, scheduler, containerized service, data pipeline, model instance, or monitoring component. Each component is described by a local state vector:
-
-$$
-\mathbf{x}_v(t) =
-\left[
-a_v(t),
-c_v(t),
-m_v(t),
-q_v(t),
-s_v(t)
-\right],
-$$
-
-where:
-
-- $a_v(t) \in [0,1]$ is the availability level
-- $c_v(t) \in [0,1]$ is the available compute capacity
-- $m_v(t) \in [0,1]$ is the available memory or storage capacity
-- $q_v(t) \in [0,1]$ is the quality-of-service level
-- $s_v(t) \in [0,1]$ is the safety and integrity confidence
-
-The global platform state is defined as:
+A component $v \in \mathcal V$ may represent a compute node, GPU, network
+link, storage service, scheduler, containerized service, data pipeline, model
+instance, or monitoring component. Its local state is represented by:
 
 $$
-\mathbf{X}(t) =
-\left\lbrace
-\mathbf{x}_v(t)
-\right\rbrace_{v \in \mathcal{V}}.
-$$
-
-The platform is exposed to disturbances from three degradation domains:
-
-$$
-\mathcal{D}
+\mathbf x_v(t)
 =
-\lbrace
-\mathcal{D}_{\mathrm{infra}},
-\mathcal{D}_{\mathrm{data}},
-\mathcal{D}_{\mathrm{AI}}
-\rbrace.
+(a_v(t), c_v(t), m_v(t), q_v(t), s_v(t)).
 $$
 
-where $\mathcal{D}_{\mathrm{infra}}$ represents infrastructure failures,
-$\mathcal{D}_{\mathrm{data}}$ represents data perturbations, and
-$\mathcal{D}_{\mathrm{AI}}$ represents degradation of AI outputs or decision
-quality..
+The variables have the following meanings:
 
+- $a_v(t) \in [0,1]$: availability level
+- $c_v(t) \in [0,1]$: available compute capacity
+- $m_v(t) \in [0,1]$: available memory or storage capacity
+- $q_v(t) \in [0,1]$: quality-of-service level
+- $s_v(t) \in [0,1]$: safety and integrity confidence
+
+The global platform state is the indexed family of component states:
+
+$$
+\mathbf X(t)
+=
+(\mathbf x_v(t))_{v \in \mathcal V}.
+$$
+
+The platform is exposed to three degradation domains:
+
+$$
+\mathcal D
+=
+(D_I, D_P, D_A).
+$$
+
+where $D_I$ denotes infrastructure degradation, $D_P$ denotes data
+perturbation, and $D_A$ denotes AI decision degradation.
 
 ```mermaid
 flowchart LR
@@ -156,20 +146,24 @@ flowchart LR
     class M metric;
 ```
 
-
-
-
 ### Functional Service Model
 
-Let $\mathcal{F} = \{f_1, f_2, \ldots, f_K\}$ be the set of essential
-functions delivered by the platform. A function may correspond to a distributed
-training phase, an inference service, a workflow stage, a simulation component,
-a scheduler function, or a data-processing pipeline.
+Let $\mathcal F$ denote the collection of essential functions delivered by the
+platform. A function $f_k$ may correspond to a distributed training phase, an
+inference service, a workflow stage, a simulation component, a scheduling
+function, or a data-processing pipeline.
 
-Each function $f_k$ is associated with a set of supporting components:
+Each function $f_k$ is supported by a subset $\mathcal V_k \subseteq \mathcal V$
+of components.
+
+For each function $f_k$, let $\mathbf X_k(t)$ denote the aggregated state of
+its supporting components:
 
 $$
-\mathcal{V}_k \subseteq \mathcal{V}.
+\mathbf X_k(t)
+=
+\operatorname{aggregate}_{v \in \mathcal V_k}
+\mathbf x_v(t).
 $$
 
 The operational quality of function $f_k$ is modeled by:
@@ -177,108 +171,92 @@ The operational quality of function $f_k$ is modeled by:
 $$
 Q_k(t)
 =
-\Phi_k
-\left(
-\operatorname*{collection}_{v \in \mathcal{V}_k}
-\mathbf{x}_v(t),
-\;
-\mathbf{d}(t)
-\right).
+\Phi_k(\mathbf X_k(t), \mathbf d(t)).
 $$
 
-where $\Phi_k(\cdot)$ is a function-specific quality model and
-$\mathbf{d}(t)$ represents the active disturbance state.
+Here, $\Phi_k$ is a function-specific quality model and $\mathbf d(t)$ is the
+active disturbance state.
 
-The normalized functional continuity of $f_k$ is:
+Let $Q_k^0$ denote the nominal quality of function $f_k$. Its normalized
+functional continuity is:
 
 $$
 C_k(t)
 =
-\frac{Q_k(t)}
-{Q_k^{\mathrm{nominal}}}
-,
+\frac{Q_k(t)}{Q_k^0},
 \qquad
 0 \leq C_k(t) \leq 1.
 $$
 
-where $Q_k^{\mathrm{nominal}}$ is the expected quality under nominal
-conditions.
-
-A function is considered operational when its continuity remains above a
-minimum acceptable threshold:
+A function remains operational when:
 
 $$
-C_k(t) \geq \tau_k,
+C_k(t) \geq \tau_k.
 $$
 
-where $\tau_k \in [0,1]$ is the function-specific service threshold.
+The threshold $\tau_k \in [0,1]$ is the minimum acceptable continuity level for
+function $f_k$.
 
-This formulation distinguishes functional resilience from simple restart
-capability: a system may lose individual components while still preserving the
-essential function $f_k$ through redundancy, degraded execution modes, or
-validated fallback paths.
+This distinction is central to BioRes-AI/HPC: a system may lose individual
+components while preserving an essential function through redundancy, degraded
+execution modes, or validated fallback paths.
 
 ### Failure Domains and Blast Radius
 
-Let $\mathcal{F}_d \subseteq \mathcal{V}$ denote a failure domain, i.e., a set
-of components that may be jointly affected by a common failure cause such as a
-power event, network partition, storage failure, software defect, or corrupted
-data source.
+Let $\mathcal F_d \subseteq \mathcal V$ be a failure domain: a group of
+components that may be jointly affected by a common cause, such as a power
+event, network partition, storage failure, software defect, or corrupted data
+source.
 
-For a fault event $e$ occurring at time $t_e$, let
-$\mathcal{A}(e) \subseteq \mathcal{V}$ be the set of affected components.
-The normalized blast radius is defined as:
+For a fault event $e$ occurring at time $t_e$, let $\mathcal A(e)$ be the set
+of affected components. The normalized component blast radius is:
 
 $$
 B(e)
 =
 \frac{
-\sum_{v \in \mathcal{A}(e)} w_v
+\sum_{v \in \mathcal A(e)} w_v
 }{
-\sum_{v \in \mathcal{V}} w_v
-},
+\sum_{v \in \mathcal V} w_v
+}.
 $$
 
-where $w_v \geq 0$ is the criticality weight of component $v$.
+The parameter $w_v \geq 0$ is the criticality weight of component $v$.
 
-A functional blast radius can also be defined as:
+Let $\omega_k$ be the criticality weight of function $f_k$. The functional
+blast radius is:
 
 $$
-B_{\mathcal{F}}(e)
+B_F(e)
 =
 \frac{
 \sum_{k=1}^{K}
 \omega_k
-\mathbb{I}
-\left[
-C_k(t_e^{+}) < \tau_k
-\right]
+\mathbb I(C_k(t_e^+) < \tau_k)
 }{
 \sum_{k=1}^{K} \omega_k
-},
+}.
 $$
 
-where $\omega_k$ is the criticality of function $f_k$,
-$t_e^{+}$ denotes the state immediately after the disturbance, and
-$\mathbb{I}[\cdot]$ is the indicator function.
+Here, $t_e^+$ is the time immediately after the disturbance and $\mathbb I$
+is the indicator function.
 
-The objective of failure-domain isolation is to minimize both component-level
-and function-level blast radii:
+Failure-domain isolation aims to minimize both the component and functional
+blast radii:
 
 $$
 \min B(e),
 \qquad
-\min B_{\mathcal{F}}(e).
+\min B_F(e).
 $$
 
 ### Redundancy and Validated Fallback Paths
 
-For each essential function $f_k$, let $\mathcal{P}_k$ be the set of
-candidate execution paths. A path may use different compute resources, data
-replicas, model replicas, communication routes, or reduced-capability service
-modes.
+For each essential function $f_k$, let $\mathcal P_k$ be the set of candidate
+execution paths. A path may use alternate compute resources, data replicas,
+model replicas, communication routes, or reduced-capability service modes.
 
-The availability of execution path $p \in \mathcal{P}_k$ is:
+For a path $p \in \mathcal P_k$, its availability is:
 
 $$
 A_{k,p}(t)
@@ -286,42 +264,36 @@ A_{k,p}(t)
 \prod_{v \in p} a_v(t).
 $$
 
-If the function can be executed through at least one valid independent path,
-its path-level availability is:
+If at least one independent path is available, the path-level availability of
+function $f_k$ is:
 
 $$
-A_k^{\mathrm{path}}(t)
+A_k^{path}(t)
 =
-1 -
-\prod_{p \in \mathcal{P}_k}
-\left(
-1 - A_{k,p}(t)
-\right).
+1
+-
+\prod_{p \in \mathcal P_k}
+(1 - A_{k,p}(t)).
 $$
 
-However, availability alone is insufficient. A fallback path must also satisfy
-correctness, integrity, quality, and safety constraints. Let the validation
-vector of path $p$ be:
+Availability alone is insufficient. A fallback path must also satisfy
+integrity, correctness, quality, and safety requirements. The validation state
+of path $p$ is:
 
 $$
-\mathbf{z}_{k,p}(t)
+\mathbf z_{k,p}(t)
 =
-\left[
-I_{k,p}(t),
-R_{k,p}(t),
-Q_{k,p}(t),
-S_{k,p}(t)
-\right],
+(I_{k,p}(t), R_{k,p}(t), Q_{k,p}(t), S_{k,p}(t)).
 $$
 
-where:
+The validation variables are:
 
-- $I_{k,p}(t)$ is the data and state integrity score
-- $R_{k,p}(t)$ is the correctness or reproducibility score
-- $Q_{k,p}(t)$ is the output quality score
-- $S_{k,p}(t)$ is the safety score
+- $I_{k,p}(t)$: data and state integrity score
+- $R_{k,p}(t)$: correctness or reproducibility score
+- $Q_{k,p}(t)$: output quality score
+- $S_{k,p}(t)$: safety score
 
-A fallback path is accepted only if:
+A fallback path is accepted only when:
 
 $$
 I_{k,p}(t) \geq \tau_I,
@@ -333,116 +305,114 @@ Q_{k,p}(t) \geq \tau_Q,
 S_{k,p}(t) \geq \tau_S.
 $$
 
-The set of validated paths is therefore:
+A function has safe continuity when there exists at least one available path
+that satisfies all validation constraints:
 
 $$
-\mathcal{P}_k^{\mathrm{valid}}(t)
-=
-\left\{
-p \in \mathcal{P}_k
-\;\middle|\;
-I_{k,p} \geq \tau_I,
-\;
-R_{k,p} \geq \tau_R,
-\;
-Q_{k,p} \geq \tau_Q,
-\;
-S_{k,p} \geq \tau_S
-\right\}.
+\exists p \in \mathcal P_k
+\quad
+\text{such that}
+\quad
+A_{k,p}(t) > 0,
 $$
 
-A function has safe continuity when at least one validated execution path is
-available:
+$$
+I_{k,p}(t) \geq \tau_I,
+\qquad
+R_{k,p}(t) \geq \tau_R,
+$$
 
 $$
-\exists p \in \mathcal{P}_k^{\mathrm{valid}}(t)
-\quad \text{such that} \quad
-A_{k,p}(t) > 0.
+Q_{k,p}(t) \geq \tau_Q,
+\qquad
+S_{k,p}(t) \geq \tau_S.
 $$
 
 ### Adaptive Scheduling and Reconfiguration
 
-Let $\mathcal{J}(t)$ be the set of active jobs, workflows, or inference
-requests at time $t$, and let $\mathcal{R}(t)$ be the set of available
+Let $\mathcal J(t)$ be the set of active jobs, workflows, or inference
+requests at time $t$. Let $\mathcal R(t)$ be the set of available
 heterogeneous resources.
 
-For each job $j \in \mathcal{J}(t)$, define the scheduling decision:
+For a job $j$ and a resource $r$, the assignment decision is:
 
 $$
 x_{jr}(t)
 =
-\begin{cases}
+\begin{matrix}
 1, & \text{if job } j \text{ is assigned to resource } r, \\
 0, & \text{otherwise.}
-\end{cases}
+\end{matrix}
 $$
 
-Each resource $r$ has capacity $C_r(t)$, memory $M_r(t)$, and an availability
-state $a_r(t)$. The allocation must satisfy:
+Each resource $r$ has capacity $C_r(t)$, memory $M_r(t)$, and availability
+$a_r(t)$. The allocation must satisfy:
 
 $$
-\sum_{r \in \mathcal{R}(t)}
+\sum_{r \in \mathcal R(t)}
 x_{jr}(t)
-\leq 1,
-\qquad
-\forall j \in \mathcal{J}(t),
+\leq 1
+\quad
+\text{for every job } j.
 $$
 
 $$
-\sum_{j \in \mathcal{J}(t)}
+\sum_{j \in \mathcal J(t)}
 c_j x_{jr}(t)
-\leq C_r(t),
-\qquad
-\forall r \in \mathcal{R}(t),
+\leq C_r(t)
+\quad
+\text{for every resource } r.
 $$
 
 $$
-\sum_{j \in \mathcal{J}(t)}
+\sum_{j \in \mathcal J(t)}
 m_j x_{jr}(t)
-\leq M_r(t),
-\qquad
-\forall r \in \mathcal{R}(t),
+\leq M_r(t)
+\quad
+\text{for every resource } r.
 $$
 
 $$
-x_{jr}(t) = 0
-\qquad
-\text{if}
-\qquad
-a_r(t) < \tau_{\mathrm{avail}}.
-$$
-
-where $c_j$ and $m_j$ are the compute and memory requirements of job $j$,
-respectively.
-
-The resilience-aware controller selects a scheduling and reconfiguration action
-$\mathbf{u}(t)$ that minimizes a weighted operational risk:
-
-$$
-\mathbf{u}^{\star}(t)
+x_{jr}(t)
 =
-\arg\min_{\mathbf{u}(t)}
-\left[
-\alpha \, L_{\mathrm{service}}(t)
-+
-\beta \, B_{\mathcal{F}}(t)
-+
-\gamma \, T_{\mathrm{recovery}}(t)
-+
-\delta \, R_{\mathrm{safety}}(t)
-+
-\epsilon \, O_{\mathrm{runtime}}(t)
-\right],
+0
+\quad
+\text{when}
+\quad
+a_r(t) < \tau_A.
 $$
 
-where:
+Here, $c_j$ and $m_j$ are the compute and memory requirements of job $j$, and
+$\tau_A$ is the minimum resource availability threshold.
 
-- $L_{\mathrm{service}}(t)$ measures loss of functional service
-- $B_{\mathcal{F}}(t)$ measures the functional blast radius
-- $T_{\mathrm{recovery}}(t)$ measures recovery duration
-- $R_{\mathrm{safety}}(t)$ measures residual correctness, integrity, or safety risk
-- $O_{\mathrm{runtime}}(t)$ measures resilience overhead
-- $\alpha, \beta, \gamma, \delta, \epsilon \geq 0$ are design weights
+The resilience controller selects a scheduling and reconfiguration action
+$\mathbf u(t)$ that minimizes weighted operational risk:
+
+$$
+\mathbf u^*(t)
+=
+\arg\min_{\mathbf u(t)}
+\Big(
+\alpha L_{service}(t)
++
+\beta B_F(t)
++
+\gamma T_{recovery}(t)
++
+\delta R_{safety}(t)
++
+\epsilon O_{runtime}(t)
+\Big).
+$$
+
+The terms are:
+
+- $L_{service}(t)$: loss of functional service
+- $B_F(t)$: functional blast radius
+- $T_{recovery}(t)$: recovery duration
+- $R_{safety}(t)$: residual correctness, integrity, or safety risk
+- $O_{runtime}(t)$: resilience runtime overhead
+- $\alpha$, $\beta$, $\gamma$, $\delta$, and $\epsilon$: non-negative design weights
 
 Possible actions include job migration, workload reprioritization, degraded
 execution modes, resource quarantine, data-source switching, model fallback,
@@ -450,39 +420,41 @@ checkpoint restoration, replica activation, and network-path reconfiguration.
 
 ### Safe and Verified Recovery
 
-Let $t_d$ be the disturbance detection time and $t_r$ be the time at which
-the system resumes operation. Recovery is considered *safe and verified* only
-when the service is restored and all validation requirements are met.
+Let $t_d$ be the disturbance detection time and $t_r$ be the time at which the
+system resumes operation.
 
 The safe recovery time is:
 
 $$
-T_{\mathrm{safe}}
+T_{safe}
 =
-t_{\mathrm{verified}} - t_d,
+t_{verified}
+-
+t_d.
 $$
 
-where $t_{\mathrm{verified}}$ is the earliest time satisfying:
+Recovery is safe and verified only when functional continuity, integrity,
+correctness, quality, and safety all satisfy their requirements:
 
 $$
-C_k(t_{\mathrm{verified}}) \geq \tau_k,
+C_k(t_{verified}) \geq \tau_k.
 $$
 
 $$
-I_k(t_{\mathrm{verified}}) \geq \tau_I,
+I_k(t_{verified}) \geq \tau_I,
 \qquad
-R_k(t_{\mathrm{verified}}) \geq \tau_R,
+R_k(t_{verified}) \geq \tau_R.
 $$
 
 $$
-Q_k(t_{\mathrm{verified}}) \geq \tau_Q,
+Q_k(t_{verified}) \geq \tau_Q,
 \qquad
-S_k(t_{\mathrm{verified}}) \geq \tau_S.
+S_k(t_{verified}) \geq \tau_S.
 $$
 
-Thus, a restarted service is not automatically considered recovered. It must
-first demonstrate functional continuity and satisfy integrity, correctness,
-quality, and safety validation criteria.
+A restarted service is therefore not automatically considered recovered. It
+must first demonstrate functional continuity and pass integrity, correctness,
+quality, and safety validation.
 
 ```mermaid
 stateDiagram-v2
@@ -493,7 +465,7 @@ stateDiagram-v2
     Isolated --> Reconfigured: Fallback or adaptation selected
     Reconfigured --> Validating: Service resumed
 
-    Validating --> VerifiedRecovery: Integrity, correctness,\nquality, and safety pass
+    Validating --> VerifiedRecovery: Integrity, correctness, quality, and safety pass
     Validating --> Degraded: Validation failure
 
     VerifiedRecovery --> Nominal: Full capability restored
@@ -506,44 +478,51 @@ stateDiagram-v2
 The detection time is:
 
 $$
-T_{\mathrm{detect}}
+T_{detect}
 =
-t_d - t_e,
+t_d
+-
+t_e.
 $$
 
-where $t_e$ is the fault occurrence time.
+Here, $t_e$ is the fault occurrence time.
 
 The recovery time is:
 
 $$
-T_{\mathrm{recover}}
+T_{recover}
 =
-t_r - t_d.
+t_r
+-
+t_d.
 $$
 
 The safe recovery time is:
 
 $$
-T_{\mathrm{safe}}
+T_{safe}
 =
-t_{\mathrm{verified}} - t_d.
+t_{verified}
+-
+t_d.
 $$
 
-The average functional continuity over an observation interval
-$[t_0, t_1]$ is:
+The average functional continuity over the observation interval from $t_0$ to
+$t_1$ is:
 
 $$
-\overline{C}_k
+\overline C_k
 =
 \frac{1}{t_1 - t_0}
 \int_{t_0}^{t_1}
-C_k(t)\,dt.
+C_k(t)
+\,dt.
 $$
 
 The weighted platform-level functional continuity is:
 
 $$
-C_{\mathrm{global}}(t)
+C_{global}(t)
 =
 \frac{
 \sum_{k=1}^{K}
@@ -556,57 +535,67 @@ $$
 The post-recovery correctness is:
 
 $$
-R_{\mathrm{post}}
+R_{post}
 =
 \frac{
-N_{\mathrm{correct}}
+N_{correct}
 }{
-N_{\mathrm{validated}}
-},
+N_{validated}
+}.
 $$
 
-where $N_{\mathrm{correct}}$ is the number of validated outputs satisfying the correctness criterion and $N_{\mathrm{validated}}$ is the number of outputs assessed after recovery.
+Here, $N_{correct}$ is the number of validated outputs satisfying the
+correctness criterion and $N_{validated}$ is the number of outputs evaluated
+after recovery.
 
 The relative resilience overhead is:
 
 $$
-O_{\mathrm{res}}
+O_{res}
 =
 \frac{
-T_{\mathrm{resilient}} - T_{\mathrm{baseline}}
+T_{resilient}
+-
+T_{baseline}
 }{
-T_{\mathrm{baseline}}
+T_{baseline}
 }.
 $$
 
-where $T_{\mathrm{resilient}}$ is the execution time with resilience mechanisms enabled and $T_{\mathrm{baseline}}$ is the execution time of the reference system.
+Here, $T_{resilient}$ is the execution time with resilience mechanisms enabled
+and $T_{baseline}$ is the execution time of the reference system.
 
 ### Resilience Objective
 
-The global objective is not merely to maximize component uptime. Instead, the framework maximizes verified functional utility under disturbances:
+The global objective is not merely to maximize component uptime. The framework
+instead maximizes verified functional utility under disturbances:
 
 $$
 \max_{\pi}
 \;
-\mathbb{E}
-\left[
+\mathbb E
+\Big(
 \int_{t_0}^{t_1}
-C_{\mathrm{global}}(t)
+C_{global}(t)
 \,dt
 -
-\lambda_1 B_{\mathcal{F}}(t)
+\lambda_1 B_F(t)
 -
-\lambda_2 T_{\mathrm{safe}}(t)
+\lambda_2 T_{safe}(t)
 -
-\lambda_3 O_{\mathrm{res}}(t)
+\lambda_3 O_{res}(t)
 -
-\lambda_4 R_{\mathrm{safety}}(t)
-\right],
+\lambda_4 R_{safety}(t)
+\Big).
 $$
 
-where $\pi$ is the resilience policy controlling monitoring, scheduling, reconfiguration, redundancy activation, and recovery validation.
+The policy $\pi$ controls monitoring, scheduling, reconfiguration, redundancy
+activation, and recovery validation.
 
-This objective formalizes the central principle of BioRes-AI/HPC: the system should remain operationally useful during disruption, limit the propagation of failures, and restore services only when recovery is demonstrably correct, safe, and trustworthy.
+This objective formalizes the central principle of BioRes-AI/HPC: the platform
+should remain operationally useful during disruption, limit failure
+propagation, and restore services only when recovery is demonstrably correct,
+safe, and trustworthy.
 
 ...
 
