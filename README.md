@@ -168,7 +168,7 @@ of its supporting components:
 ```math
 \mathbf{X}_k(t)
 =
-\operatorname{aggregate}_{v \in \mathcal{V}_k}
+\sum_{v \in \mathcal{V}_k}
 \mathbf{x}_v(t).
 ```
 
