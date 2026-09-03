@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: biores-ai-hpc
+Version: 0.1.0
+Summary: Bio-inspired resilience framework for safe and verified recovery in AI/HPC workflows.
+Author: Patrick Lemoine
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: PyYAML>=6.0
+Requires-Dist: typer>=0.12.0
+Requires-Dist: rich>=13.7.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: ruff>=0.6.0; extra == "dev"
+Requires-Dist: mypy>=1.10.0; extra == "dev"
+Dynamic: license-file
