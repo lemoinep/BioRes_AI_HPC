@@ -20,6 +20,7 @@ def test_latest_valid_checkpoint_is_selected(tmp_path: Path) -> None:
     write_state_file(state_40, iteration=40, residual=0.12)
 
     store.write(
+        attempt_id=0,
         checkpoint_id="ckpt_20",
         iteration=20,
         residual=0.35,
@@ -27,6 +28,7 @@ def test_latest_valid_checkpoint_is_selected(tmp_path: Path) -> None:
         state_path=str(state_20),
     )
     store.write(
+        attempt_id=0,
         checkpoint_id="ckpt_40",
         iteration=40,
         residual=0.12,
@@ -53,6 +55,7 @@ def test_corrupted_checkpoint_is_ignored(tmp_path: Path) -> None:
     write_state_file(state_40, iteration=40, residual=0.12)
 
     store.write(
+        attempt_id=0,
         checkpoint_id="ckpt_20",
         iteration=20,
         residual=0.35,
@@ -60,6 +63,7 @@ def test_corrupted_checkpoint_is_ignored(tmp_path: Path) -> None:
         state_path=str(state_20),
     )
     store.write(
+        attempt_id=0,
         checkpoint_id="ckpt_40",
         iteration=40,
         residual=0.12,
@@ -83,6 +87,7 @@ def test_checkpoint_with_missing_state_file_is_rejected(
     missing_state = store.run_directory / "ckpt_20.state"
 
     store.write(
+        attempt_id=0,
         checkpoint_id="ckpt_20",
         iteration=20,
         residual=0.35,
@@ -100,6 +105,7 @@ def test_no_valid_checkpoint_returns_none(tmp_path: Path) -> None:
     write_state_file(state_20, iteration=20, residual=0.35)
 
     store.write(
+        attempt_id=0,
         checkpoint_id="ckpt_20",
         iteration=20,
         residual=0.35,

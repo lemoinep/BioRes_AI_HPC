@@ -31,13 +31,14 @@ _ALLOWED_TRANSITIONS: dict[RecoveryState, set[RecoveryState]] = {
         RecoveryState.FAILED,
     },
     RecoveryState.DEGRADED: {
+        RecoveryState.DETECTED,
         RecoveryState.RESTORED,
         RecoveryState.UNSAFE,
         RecoveryState.FAILED,
     },
     RecoveryState.RESTORED: {
+        RecoveryState.DETECTED,
         RecoveryState.VERIFIED,
-        RecoveryState.UNSAFE,
         RecoveryState.FAILED,
     },
     RecoveryState.VERIFIED: {

@@ -34,3 +34,17 @@ def test_invalid_transition_is_rejected() -> None:
 
     with pytest.raises(InvalidStateTransition):
         machine.transition_to(RecoveryState.VERIFIED)
+
+
+def test_restored_state_can_detect_a_new_incident() -> None:
+    machine = RecoveryStateMachine()
+
+    machine.transition_to(RecoveryState.DETECTED)
+    machine.transition_to(RecoveryState.ISOLATED)
+    machine.transition_to(RecoveryState.DEGRADED)
+    machine.transition_to(RecoveryState.RESTORED)
+
+    machine.transition_to(RecoveryState.DETECTED)
+
+    assert machine.state == RecoveryState.DETECTED
+

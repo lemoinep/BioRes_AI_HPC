@@ -10,6 +10,7 @@ from typing import Any
 @dataclass(frozen=True)
 class CheckpointMetadata:
     checkpoint_id: str
+    attempt_id: int
     iteration: int
     residual: float
     checksum: str
@@ -34,9 +35,15 @@ class CheckpointStore:
     def manifest_path(self) -> Path:
         return self.run_directory / "manifest.json"
 
+    def attempt_directory(self, attempt_id: int) -> Path:
+        directory = self.run_directory / f"attempt-{attempt_id}"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
     def write(
         self,
         *,
+        attempt_id: int,
         checkpoint_id: str,
         iteration: int,
         residual: float,
@@ -44,6 +51,7 @@ class CheckpointStore:
         state_path: str,
     ) -> CheckpointMetadata:
         payload: dict[str, Any] = {
+            "attempt_id": attempt_id,
             "checkpoint_id": checkpoint_id,
             "iteration": iteration,
             "residual": residual,
@@ -57,6 +65,7 @@ class CheckpointStore:
             checksum = f"corrupted-{checksum}"
 
         metadata = CheckpointMetadata(
+            attempt_id=attempt_id,
             checkpoint_id=checkpoint_id,
             iteration=iteration,
             residual=residual,
@@ -64,7 +73,8 @@ class CheckpointStore:
             state_path=state_path,
         )
 
-        checkpoint_path = self.run_directory / f"{checkpoint_id}.json"
+        checkpoint_path = self.attempt_directory(attempt_id) / f"{checkpoint_id}.json"
+
         checkpoint_path.write_text(
             self._canonical_json(asdict(metadata)),
             encoding="utf-8",
@@ -80,11 +90,18 @@ class CheckpointStore:
         manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         checkpoints: list[StoredCheckpoint] = []
 
-        for checkpoint_id in manifest.get("checkpoints", []):
-            checkpoint_path = self.run_directory / f"{checkpoint_id}.json"
+        for entry in manifest.get("checkpoints", []):
+            attempt_id = int(entry["attempt_id"])
+            checkpoint_id = str(entry["checkpoint_id"])
+
+            checkpoint_path = (
+                self.attempt_directory(attempt_id) / f"{checkpoint_id}.json"
+            )
             checkpoints.append(self._load_and_validate(checkpoint_path))
 
         return checkpoints
+
+
 
     def latest_valid(self) -> StoredCheckpoint | None:
         valid_checkpoints = [
@@ -106,6 +123,7 @@ class CheckpointStore:
             return StoredCheckpoint(
                 metadata=CheckpointMetadata(
                     checkpoint_id=path.stem,
+                    attempt_id=-1,
                     iteration=-1,
                     residual=float("inf"),
                     checksum="missing",
@@ -135,6 +153,7 @@ class CheckpointStore:
 
         payload = {
             "checkpoint_id": metadata.checkpoint_id,
+            "attempt_id": metadata.attempt_id,
             "iteration": metadata.iteration,
             "residual": metadata.residual,
             "state_path": metadata.state_path,
@@ -168,6 +187,7 @@ class CheckpointStore:
             reason="validated",
         )
 
+
     def _update_manifest(self, metadata: CheckpointMetadata) -> None:
         if self.manifest_path.exists():
             manifest = json.loads(
@@ -175,18 +195,24 @@ class CheckpointStore:
             )
         else:
             manifest = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "checkpoints": [],
             }
 
-        checkpoint_ids: list[str] = manifest["checkpoints"]
+        entry = {
+            "attempt_id": metadata.attempt_id,
+            "checkpoint_id": metadata.checkpoint_id,
+        }
 
-        if metadata.checkpoint_id not in checkpoint_ids:
-            checkpoint_ids.append(metadata.checkpoint_id)
+        entries: list[dict[str, Any]] = manifest["checkpoints"]
 
-        checkpoint_ids.sort(
-            key=lambda checkpoint_id: int(
-                checkpoint_id.removeprefix("ckpt_")
+        if entry not in entries:
+            entries.append(entry)
+
+        entries.sort(
+            key=lambda item: (
+                int(item["attempt_id"]),
+                int(str(item["checkpoint_id"]).removeprefix("ckpt_")),
             )
         )
 
@@ -195,6 +221,7 @@ class CheckpointStore:
             encoding="utf-8",
         )
 
+   
     @staticmethod
     def _canonical_json(value: dict[str, Any]) -> str:
         return json.dumps(
