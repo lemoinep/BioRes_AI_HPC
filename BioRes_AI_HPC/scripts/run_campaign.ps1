@@ -58,10 +58,17 @@ foreach ($runId in $runIds) {
     }
 }
 
+$csvOutput = "results\reports\${CampaignId}_runs_summary.csv"
+$campaignSummaryOutput = "results\reports\${CampaignId}_summary.json"
+$reportOutput = "results\reports\${CampaignId}_report.md"
+
 Write-Host ""
 Write-Host "=== Exporting campaign CSV ===" -ForegroundColor Cyan
 
-& biores export-runs-csv
+& biores export-runs-csv `
+    --runs-root ".\results\runs" `
+    --run-prefix "${CampaignId}-" `
+    --output $csvOutput
 
 if ($LASTEXITCODE -ne 0) {
     throw "CSV export failed (exit code $LASTEXITCODE)"
@@ -70,7 +77,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "=== Analyzing campaign ===" -ForegroundColor Cyan
 
-& biores analyze-runs
+& biores analyze-runs `
+    --input $csvOutput `
+    --output $campaignSummaryOutput
 
 if ($LASTEXITCODE -ne 0) {
     throw "Campaign analysis failed (exit code $LASTEXITCODE)"
@@ -79,7 +88,10 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "=== Generating Markdown report ===" -ForegroundColor Cyan
 
-& biores generate-report
+& biores generate-report `
+    --input-csv $csvOutput `
+    --campaign-summary $campaignSummaryOutput `
+    --output $reportOutput
 
 if ($LASTEXITCODE -ne 0) {
     throw "Report generation failed (exit code $LASTEXITCODE)"
@@ -87,6 +99,6 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Campaign completed successfully." -ForegroundColor Green
-Write-Host "CSV report: results\reports\runs_summary.csv"
-Write-Host "JSON report: results\reports\campaign_summary.json"
-Write-Host "Markdown report: results\reports\campaign_report.md"
+Write-Host "CSV report: $csvOutput"
+Write-Host "JSON report: $campaignSummaryOutput"
+Write-Host "Markdown report: $reportOutput"

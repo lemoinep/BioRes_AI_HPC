@@ -207,7 +207,10 @@ def write_run_summary(event_logger: JsonlEventLogger) -> Path:
 
     return summary_path
 
-def collect_run_summaries(root: str | Path) -> list[dict[str, Any]]:
+def collect_run_summaries(
+    root: str | Path,
+    run_prefix: str | None = None,
+) -> list[dict[str, Any]]:
     runs_root = Path(root)
 
     if not runs_root.exists():
@@ -216,6 +219,14 @@ def collect_run_summaries(root: str | Path) -> list[dict[str, Any]]:
     summaries: list[dict[str, Any]] = []
 
     for summary_path in sorted(runs_root.glob("*/summary.json")):
+        run_directory_name = summary_path.parent.name
+
+        if (
+            run_prefix is not None
+            and not run_directory_name.startswith(run_prefix)
+        ):
+            continue
+
         with summary_path.open("r", encoding="utf-8") as stream:
             summary = json.load(stream)
 
@@ -228,8 +239,12 @@ def collect_run_summaries(root: str | Path) -> list[dict[str, Any]]:
 def export_run_summaries_csv(
     runs_root: str | Path,
     output_path: str | Path,
+    run_prefix: str | None = None,
 ) -> Path:
-    summaries = collect_run_summaries(runs_root)
+    summaries = collect_run_summaries(
+        runs_root,
+        run_prefix=run_prefix,
+    )
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
 

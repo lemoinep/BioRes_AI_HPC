@@ -942,22 +942,22 @@ def export_runs_csv(
         "--runs-root",
         help="Directory containing per-run summary.json files.",
     ),
+    run_prefix: str | None = typer.Option(
+        None,
+        "--run-prefix",
+        help="Only export summaries whose run directory starts with this prefix.",
+    ),
     output: Path = typer.Option(
         Path("results/reports/runs_summary.csv"),
         "--output",
         help="Destination CSV path.",
     ),
 ) -> None:
-    """Export all run summary.json files to a consolidated CSV report."""
     output_path = export_run_summaries_csv(
         runs_root=runs_root,
         output_path=output,
-    )
-
-    console.print(
-        "[green]Run summaries exported:[/green] "
-        f"{output_path}"
-    )  
+        run_prefix=run_prefix,
+    ) 
 
 @app.command("analyze-runs")
 def analyze_runs(
