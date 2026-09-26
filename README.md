@@ -2,7 +2,7 @@
 
 *From Microbial Ecosystem Resilience to Adaptive AI/HPC Architectures: A Framework for Safe and Verified Functional Recovery*
 
-[![Version](https://img.shields.io/badge/version-0.1-green.svg)](https://github.com/lemoinep/BioRes_AI_HPC)
+[![Version](https://img.shields.io/badge/version-0.3-green.svg)](https://github.com/lemoinep/BioRes_AI_HPC)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![C++17](https://img.shields.io/badge/c%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
