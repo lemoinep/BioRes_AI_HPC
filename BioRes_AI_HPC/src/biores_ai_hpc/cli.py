@@ -18,6 +18,10 @@ from biores_ai_hpc.telemetry import (
     FaultDomain,
     JsonlEventLogger,
     TelemetryEvent,
+    analyze_run_summaries_csv,
+    export_run_summaries_csv,
+    generate_campaign_report,
+    write_run_summary,
 )
 
 app = typer.Typer(
@@ -158,7 +162,7 @@ def demo(
 
 
     log_event(
-        "run_completed",
+    "run_completed",
         severity=(
             "info"
             if controller.state == RecoveryState.VERIFIED
@@ -183,7 +187,10 @@ def demo(
     )
 
     if controller.state != RecoveryState.VERIFIED:
-        raise typer.Exit(code=3)
+        raise typer.Exit(code=2)
+
+
+ 
 
 
 @app.command(name="run-failure")
@@ -904,8 +911,7 @@ def run_cascade(
     )
 
 
-
-
+    summary_path = write_run_summary(event_logger)
 
     console.print()
     console.print(f"Final state: [bold]{controller.state.value}[/bold]")
@@ -913,13 +919,121 @@ def run_cascade(
     console.print()
     console.print("[bold]Cascade recovery summary[/bold]")
     console.print(f"  Recoveries attempted: {recovery_count}")
-    console.print(f"  Final checkpoint: {latest_checkpoint.metadata.checkpoint_id if latest_checkpoint else 'none'}")
+    console.print(
+        "  Final checkpoint: "
+        f"{latest_checkpoint.metadata.checkpoint_id if latest_checkpoint else 'none'}"
+    )
     console.print(f"  Total recovery runtime: {total_recovery_time:.6f} s")
     console.print(f"  Final verification time: {verification_elapsed:.6f} s")
     console.print(f"  Total experiment time: {total_elapsed:.6f} s")
 
+    console.print(
+        "[green]Run summary written:[/green] "
+        f"{summary_path}"
+    )
+
     if controller.state != RecoveryState.VERIFIED:
-        raise typer.Exit(code=3)
+        raise typer.Exit(code=2)
+
+@app.command("export-runs-csv")
+def export_runs_csv(
+    runs_root: Path = typer.Option(
+        Path("results/runs"),
+        "--runs-root",
+        help="Directory containing per-run summary.json files.",
+    ),
+    output: Path = typer.Option(
+        Path("results/reports/runs_summary.csv"),
+        "--output",
+        help="Destination CSV path.",
+    ),
+) -> None:
+    """Export all run summary.json files to a consolidated CSV report."""
+    output_path = export_run_summaries_csv(
+        runs_root=runs_root,
+        output_path=output,
+    )
+
+    console.print(
+        "[green]Run summaries exported:[/green] "
+        f"{output_path}"
+    )  
+
+@app.command("analyze-runs")
+def analyze_runs(
+    input: Path = typer.Option(
+        Path("results/reports/runs_summary.csv"),
+        "--input",
+        help="Consolidated run-summary CSV to analyze.",
+    ),
+    output: Path = typer.Option(
+        Path("results/reports/campaign_summary.json"),
+        "--output",
+        help="Destination campaign-summary JSON report.",
+    ),
+) -> None:
+    """Analyze aggregated run summaries and write campaign statistics."""
+    if not input.exists():
+        console.print(
+            "[red]Input CSV does not exist:[/red] "
+            f"{input}"
+        )
+        raise typer.Exit(code=2)
+
+    output_path = analyze_run_summaries_csv(
+        csv_path=input,
+        output_path=output,
+    )
+
+    console.print(
+        "[green]Campaign summary written:[/green] "
+        f"{output_path}"
+    )
+
+@app.command("generate-report")
+def generate_report(
+    input_csv: Path = typer.Option(
+        Path("results/reports/runs_summary.csv"),
+        "--input-csv",
+        help="Consolidated CSV containing one row per run.",
+    ),
+    campaign_summary: Path = typer.Option(
+        Path("results/reports/campaign_summary.json"),
+        "--campaign-summary",
+        help="Campaign-level JSON analysis report.",
+    ),
+    output: Path = typer.Option(
+        Path("results/reports/campaign_report.md"),
+        "--output",
+        help="Destination Markdown report.",
+    ),
+) -> None:
+    """Generate a Markdown campaign report from CSV and JSON artifacts."""
+    if not input_csv.exists():
+        console.print(
+            "[red]Input CSV does not exist:[/red] "
+            f"{input_csv}"
+        )
+        raise typer.Exit(code=2)
+
+    if not campaign_summary.exists():
+        console.print(
+            "[red]Campaign summary does not exist:[/red] "
+            f"{campaign_summary}"
+        )
+        raise typer.Exit(code=2)
+
+    output_path = generate_campaign_report(
+        csv_path=input_csv,
+        campaign_summary_path=campaign_summary,
+        output_path=output,
+    )
+
+    console.print(
+        "[green]Campaign report written:[/green] "
+        f"{output_path}"
+    )
+
 
 if __name__ == "__main__":
     app()
