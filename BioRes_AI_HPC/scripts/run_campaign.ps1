@@ -1,13 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$CampaignId = "campaign-001",
-    [int]$RunCount = 3,
+    [string]$ScenarioConfig = ".\configs\cascade_corruption.json",
     [string]$Worker = ".\build\cpp\Release\biores_worker.exe",
-    [int]$Iterations = 100,
-    [int]$CheckpointInterval = 20,
-    [int]$FirstFailAt = 55,
-    [int]$SecondFailAt = 85,
-    [int]$CorruptRecoveryCheckpointAt = 80,
     [switch]$CleanCampaignArtifacts
 )
 
@@ -16,12 +11,25 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $projectRoot
 
+if (-not (Test-Path $ScenarioConfig)) {
+    throw "Scenario configuration file was not found: $ScenarioConfig"
+}
+
 if (-not (Test-Path $Worker)) {
     throw "Worker executable was not found: $Worker"
 }
 
-$runIds = 1..$RunCount | ForEach-Object {
-    "{0}-run-{1:D2}" -f $CampaignId, $_
+$scenario = Get-Content $ScenarioConfig -Raw | ConvertFrom-Json
+
+$runCount = $scenario.campaign.run_count
+$runIdTemplate = $scenario.campaign.run_id_template
+
+$runIds = 1..$runCount | ForEach-Object {
+    $runNumber = $_
+
+    $runIdTemplate `
+        -replace "\{campaign_id\}", $CampaignId `
+        -replace "\{run_number:02d\}", ("{0:D2}" -f $runNumber)
 }
 
 if ($CleanCampaignArtifacts) {
@@ -40,27 +48,28 @@ if ($CleanCampaignArtifacts) {
     }
 }
 
+$csvOutput = "results\reports\${CampaignId}_runs_summary.csv"
+$campaignSummaryOutput = "results\reports\${CampaignId}_summary.json"
+$reportOutput = "results\reports\${CampaignId}_report.md"
+
+$runNumber = 0
+
 foreach ($runId in $runIds) {
+    $runNumber++
+
     Write-Host ""
     Write-Host "=== Starting $runId ===" -ForegroundColor Cyan
 
-    & biores run-cascade `
-        --worker $Worker `
-        --iterations $Iterations `
-        --checkpoint-interval $CheckpointInterval `
-        --first-fail-at $FirstFailAt `
-        --second-fail-at $SecondFailAt `
-        --corrupt-recovery-checkpoint-at $CorruptRecoveryCheckpointAt `
-        --run-id $runId
+    & biores run-scenario `
+        --config $ScenarioConfig `
+        --campaign-id $CampaignId `
+        --run-number $runNumber `
+        --worker $Worker
 
     if ($LASTEXITCODE -ne 0) {
         throw "Run failed: $runId (exit code $LASTEXITCODE)"
     }
 }
-
-$csvOutput = "results\reports\${CampaignId}_runs_summary.csv"
-$campaignSummaryOutput = "results\reports\${CampaignId}_summary.json"
-$reportOutput = "results\reports\${CampaignId}_report.md"
 
 Write-Host ""
 Write-Host "=== Exporting campaign CSV ===" -ForegroundColor Cyan
@@ -99,6 +108,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Campaign completed successfully." -ForegroundColor Green
+Write-Host "Scenario: $ScenarioConfig"
 Write-Host "CSV report: $csvOutput"
 Write-Host "JSON report: $campaignSummaryOutput"
 Write-Host "Markdown report: $reportOutput"

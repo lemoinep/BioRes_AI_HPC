@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "scenario_id": "cascade_single_run",
+  "description": "Single-run validation of the campaign workflow.",
+  "worker": {
+    "iterations": 100,
+    "checkpoint_interval": 20,
+    "first_fail_at": 55,
+    "second_fail_at": 85,
+    "corrupt_recovery_checkpoint_at": 80,
+    "residual_threshold": 0.01
+  },
+  "campaign": {
+    "run_count": 1,
+    "run_id_template": "{campaign_id}-run-{run_number:02d}"
+  }
+}

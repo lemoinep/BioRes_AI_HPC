@@ -24,6 +24,11 @@ from biores_ai_hpc.telemetry import (
     write_run_summary,
 )
 
+from biores_ai_hpc.scenario import (
+    ScenarioConfigError,
+    load_scenario_config,
+)
+
 app = typer.Typer(
     name="biores",
     help="BioRes-AI/HPC resilience prototype.",
@@ -189,8 +194,66 @@ def demo(
     if controller.state != RecoveryState.VERIFIED:
         raise typer.Exit(code=2)
 
+@app.command("run-scenario")
+def run_scenario(
+    config: Path = typer.Option(
+        ...,
+        "--config",
+        help="Path to a scenario JSON configuration file.",
+    ),
+    campaign_id: str = typer.Option(
+        ...,
+        "--campaign-id",
+        help="Campaign identifier used to build the run ID.",
+    ),
+    run_number: int = typer.Option(
+        ...,
+        "--run-number",
+        help="Run number within the campaign.",
+        min=1,
+    ),
+    worker: Path = typer.Option(
+        ...,
+        "--worker",
+        help="Path to the C++ worker executable.",
+    ),
+) -> None:
+    """Run one cascade-recovery experiment from a JSON scenario."""
+    try:
+        scenario = load_scenario_config(config)
+    except ScenarioConfigError as error:
+        console.print(
+            f"[red]Invalid scenario configuration:[/red] {error}"
+        )
+        raise typer.Exit(code=2) from error
 
- 
+    if not worker.exists():
+        console.print(
+            f"[red]Worker executable does not exist:[/red] {worker}"
+        )
+        raise typer.Exit(code=2)
+
+    run_id = scenario.campaign.run_id_template.format(
+        campaign_id=campaign_id,
+        run_number=run_number,
+    )
+
+    console.print(f"[cyan]Scenario:[/cyan] {scenario.scenario_id}")
+    console.print(f"[cyan]Run ID:[/cyan] {run_id}")
+
+    run_cascade(
+        worker=worker,
+        iterations=scenario.worker.iterations,
+        checkpoint_interval=scenario.worker.checkpoint_interval,
+        first_fail_at=scenario.worker.first_fail_at,
+        second_fail_at=scenario.worker.second_fail_at,
+        corrupt_recovery_checkpoint_at=(
+            scenario.worker.corrupt_recovery_checkpoint_at
+        ),
+        run_id=run_id,
+        checkpoint_root=Path("results/checkpoints"),
+        residual_threshold=scenario.worker.residual_threshold,
+    )
 
 
 @app.command(name="run-failure")
@@ -440,50 +503,16 @@ def run_failure(
 
 @app.command(name="run-cascade")
 def run_cascade(
-    worker: Path = typer.Option(
-        Path("build/cpp/Release/biores_worker.exe"),
-        help="Path to the C++ worker executable.",
-    ),
-    iterations: int = typer.Option(
-        100,
-        min=1,
-        help="Total number of workflow iterations.",
-    ),
-    checkpoint_interval: int = typer.Option(
-        20,
-        min=1,
-        help="Checkpoint interval in iterations.",
-    ),
-    first_fail_at: int = typer.Option(
-        55,
-        min=1,
-        help="Iteration of the first injected worker failure.",
-    ),
-    second_fail_at: int = typer.Option(
-        85,
-        min=1,
-        help="Iteration of the second injected worker failure.",
-    ),
-     corrupt_recovery_checkpoint_at: int | None = typer.Option(
-        None,
-        help=(
-            "Mark a checkpoint created during the first recovery as "
-            "corrupted."
-        ),
-    ),
-    run_id: str = typer.Option(
-        "cascade-run",
-        help="Identifier used for checkpoint storage.",
-    ),
-    checkpoint_root: Path = typer.Option(
-        Path("results/checkpoints"),
-        help="Root directory containing checkpoint artifacts.",
-    ),
-    residual_threshold: float = typer.Option(
-        0.01,
-        min=0.0,
-        help="Maximum acceptable residual after final recovery.",
-    ),
+     *,
+    worker: Path,
+    iterations: int,
+    checkpoint_interval: int,
+    first_fail_at: int,
+    second_fail_at: int,
+    corrupt_recovery_checkpoint_at: int | None,
+    run_id: str,
+    checkpoint_root: Path = Path("results/checkpoints"),
+    residual_threshold: float = 0.01,
 ) -> None:
     """Inject two failures and recover from persistent verified checkpoints."""
     if not worker.exists():
@@ -935,6 +964,65 @@ def run_cascade(
     if controller.state != RecoveryState.VERIFIED:
         raise typer.Exit(code=2)
 
+
+@app.command("run-cascade")
+def run_cascade_command(
+    worker: Path = typer.Option(
+        Path("build/cpp/Release/biores_worker.exe"),
+        help="Path to the C++ worker executable.",
+    ),
+    iterations: int = typer.Option(
+        100,
+        min=1,
+        help="Total number of workflow iterations.",
+    ),
+    checkpoint_interval: int = typer.Option(
+        20,
+        min=1,
+        help="Checkpoint interval in iterations.",
+    ),
+    first_fail_at: int = typer.Option(
+        55,
+        min=1,
+        help="Iteration of the first injected worker failure.",
+    ),
+    second_fail_at: int = typer.Option(
+        85,
+        min=1,
+        help="Iteration of the second injected worker failure.",
+    ),
+    corrupt_recovery_checkpoint_at: int | None = typer.Option(
+        None,
+        help="Iteration of the deliberately corrupted recovery checkpoint.",
+    ),
+    run_id: str = typer.Option(
+        ...,
+        help="Unique identifier for the recovery experiment.",
+    ),
+    checkpoint_root: Path = typer.Option(
+        Path("results/checkpoints"),
+        help="Root directory for checkpoint artifacts.",
+    ),
+    residual_threshold: float = typer.Option(
+        0.01,
+        "--residual-threshold",
+        help="Maximum residual accepted during final verification.",
+    ),
+
+) -> None:
+    """Inject two failures and recover from persistent verified checkpoints."""
+    run_cascade(
+        worker=worker,
+        iterations=iterations,
+        checkpoint_interval=checkpoint_interval,
+        first_fail_at=first_fail_at,
+        second_fail_at=second_fail_at,
+        corrupt_recovery_checkpoint_at=corrupt_recovery_checkpoint_at,
+        run_id=run_id,
+        checkpoint_root=checkpoint_root,
+        residual_threshold=residual_threshold,
+    )
+
 @app.command("export-runs-csv")
 def export_runs_csv(
     runs_root: Path = typer.Option(
@@ -958,6 +1046,7 @@ def export_runs_csv(
         output_path=output,
         run_prefix=run_prefix,
     ) 
+    print(f"Run summaries exported: {output}")
 
 @app.command("analyze-runs")
 def analyze_runs(
