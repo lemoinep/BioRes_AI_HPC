@@ -1,6 +1,7 @@
 
 import csv
 import json
+import pytest
 
 from biores_ai_hpc.telemetry import (
     analyze_run_summaries_csv,
@@ -252,23 +253,37 @@ def test_analyze_run_summaries_csv(tmp_path) -> None:
     }
     assert summary["failed_run_ids"] == ["run-c"]
 
+    total_timing = summary["timing_seconds"]["total_experiment"]
+
     assert summary["timing_seconds"]["total_experiment"] == {
+        "count": 3,
         "mean": 11.0 / 3.0,
         "median": 4.0,
         "min": 1.0,
         "max": 6.0,
+        "sample_stddev": pytest.approx(2.516611478423583),
     }
+
+    recovery_timing = summary["timing_seconds"]["recovery"]
+
     assert summary["timing_seconds"]["recovery"] == {
+        "count": 3,
         "mean": 5.0 / 3.0,
         "median": 2.0,
         "min": 0.0,
         "max": 3.0,
+        "sample_stddev": pytest.approx(1.5275252316519468),
     }
+
+    verification_timing = summary["timing_seconds"]["verification"]
+
     assert summary["timing_seconds"]["verification"] == {
+        "count": 2,
         "mean": 0.005,
         "median": 0.005,
         "min": 0.004,
         "max": 0.006,
+        "sample_stddev": pytest.approx(0.001414213562373095),
     }
 
 
@@ -356,4 +371,19 @@ def test_generate_campaign_report(tmp_path) -> None:
     assert "| run-a | True | verified |" in report
     assert "| run-b | False | failed |" in report
     assert "- `run-b`" in report
-    assert "The controller rejects the corrupted `ckpt_80`" in report
+    
+    assert "## Recovery protocol" in report
+    assert (
+        "Fault injection and checkpoint corruption are configured "
+        "by the experiment scenario."
+    ) in report
+    assert (
+        "This report does not reconstruct the exact fault "
+        "schedule from the aggregated CSV."
+    ) in report
+
+    assert "Sample std. dev. (s)" in report
+    assert "Cumulative recovery runtime per run" in report
+
+    assert "The controller rejects the corrupted `ckpt_80`" not in report
+    assert "iteration 55" not in report

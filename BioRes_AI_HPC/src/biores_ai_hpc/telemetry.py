@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 from collections.abc import Iterable
 import csv
-from statistics import mean, median
-
+from statistics import mean, median, stdev
+from html import escape
 
 def _as_float(value: Any) -> float | None:
     if value in (None, ""):
@@ -131,6 +131,12 @@ def build_run_summary(
         for event in selection_events
     ]
 
+    start_payload = (
+        run_started.get("payload", {})
+        if run_started is not None
+        else {}
+    )
+
     completion_payload = (
         run_completed.get("payload", {})
         if run_completed is not None
@@ -145,6 +151,11 @@ def build_run_summary(
 
     return {
         "schema_version": 1,
+        "metadata": start_payload.get("metadata", {}),
+        "scenario": start_payload.get("scenario"),
+        "scenario_snapshot_file": start_payload.get(
+            "scenario_snapshot_file"
+        ),
         "run_id": (
             run_completed.get("run_id")
             if run_completed is not None
@@ -156,6 +167,8 @@ def build_run_summary(
         ),
         "final_state": final_state,
         "success": final_state == "verified",
+        "failure_reason": completion_payload.get("failure_reason"),
+        "failure_phase": completion_payload.get("failure_phase"),
         "recovery_count": completion_payload.get("recovery_count", 0),
         "fault_count": len(fault_events),
         "checkpoint_count": len(checkpoint_events),
@@ -267,6 +280,11 @@ def export_run_summaries_csv(
         "recovery_source_count",
         "recovery_sources",
         "summary_path",
+        "scenario_id",
+        "campaign_id",
+        "run_number",
+        "failure_reason",
+        "failure_phase",
     ]
 
     with destination.open(
@@ -284,6 +302,7 @@ def export_run_summaries_csv(
             final_checkpoint = summary.get("final_checkpoint", {})
             metrics = summary.get("metrics", {})
             recovery_sources = summary.get("recovery_sources", [])
+            metadata = summary.get("metadata") or {}
 
             writer.writerow(
                 {
@@ -323,6 +342,11 @@ def export_run_summaries_csv(
                         separators=(",", ":"),
                     ),
                     "summary_path": summary.get("_summary_path"),
+                    "scenario_id": metadata.get("scenario_id"),
+                    "campaign_id": metadata.get("campaign_id"),
+                    "run_number": metadata.get("run_number"),
+                    "failure_reason": summary.get("failure_reason"),
+                    "failure_phase": summary.get("failure_phase"),
                 }
             )
 
@@ -346,20 +370,28 @@ def _numeric_values(
     return values
 
 
-def _describe(values: list[float]) -> dict[str, float | None]:
-    if not values:
+def _describe(
+    values: list[float],
+) -> dict[str, float | int | None]:
+    count = len(values)
+
+    if count == 0:
         return {
+            "count": 0,
             "mean": None,
             "median": None,
             "min": None,
             "max": None,
+            "sample_stddev": None,
         }
 
     return {
+        "count": count,
         "mean": mean(values),
         "median": median(values),
         "min": min(values),
         "max": max(values),
+        "sample_stddev": stdev(values) if count >= 2 else None,
     }
 
 
@@ -458,6 +490,20 @@ def _format_metric(
     return f"{value:.{decimals}f}"
 
 
+def _markdown_cell(value: Any) -> str:
+    if value is None or value == "":
+        return "n/a"
+
+    text = escape(str(value), quote=False)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    return (
+        text.replace("|", "&#124;")
+        .replace("`", "&#96;")
+        .replace("\n", "<br>")
+    )
+
+
 def generate_campaign_report(
     csv_path: str | Path,
     campaign_summary_path: str | Path,
@@ -508,29 +554,56 @@ def generate_campaign_report(
         "",
         "## Timing statistics",
         "",
-        "| Measure | Mean (s) | Median (s) | Min (s) | Max (s) |",
-        "|---|---:|---:|---:|---:|",
+        (
+            "Statistics include available durations from all runs, "
+            "including failed runs. N is the number of available values "
+            "for each measure. Missing durations are not replaced with zero."
+        ),
+        "",
+        (
+            "Recovery runtime is cumulative per run, not the duration "
+            "of an individual recovery attempt."
+        ),
+        "",
+        (
+            "Sample standard deviation is reported only when N >= 2; "
+            "otherwise it is shown as n/a."
+        ),
+        "",
+        (
+            "| Measure | N | Mean (s) | Median (s) | Min (s) | "
+            "Max (s) | Sample std. dev. (s) |"
+        ),
+        "|---|---:|---:|---:|---:|---:|---:|",
         (
             "| Total experiment | "
+            f"{_format_metric(total_timing.get('count'))} | "
             f"{_format_metric(total_timing.get('mean'))} | "
             f"{_format_metric(total_timing.get('median'))} | "
             f"{_format_metric(total_timing.get('min'))} | "
-            f"{_format_metric(total_timing.get('max'))} |"
+            f"{_format_metric(total_timing.get('max'))} | "
+            f"{_format_metric(total_timing.get('sample_stddev'))} |"
         ),
         (
-            "| Recovery runtime | "
+            "| Cumulative recovery runtime per run | "
+            f"{_format_metric(recovery_timing.get('count'))} | "
             f"{_format_metric(recovery_timing.get('mean'))} | "
             f"{_format_metric(recovery_timing.get('median'))} | "
             f"{_format_metric(recovery_timing.get('min'))} | "
-            f"{_format_metric(recovery_timing.get('max'))} |"
+            f"{_format_metric(recovery_timing.get('max'))} | "
+            f"{_format_metric(recovery_timing.get('sample_stddev'))} |"
         ),
         (
             "| Final verification | "
+            f"{_format_metric(verification_timing.get('count'))} | "
             f"{_format_metric(verification_timing.get('mean'))} | "
             f"{_format_metric(verification_timing.get('median'))} | "
             f"{_format_metric(verification_timing.get('min'))} | "
-            f"{_format_metric(verification_timing.get('max'))} |"
+            f"{_format_metric(verification_timing.get('max'))} | "
+            f"{_format_metric(verification_timing.get('sample_stddev'))} |"
         ),
+        "",
+
         "",
         "## Run results",
         "",
@@ -556,19 +629,49 @@ def generate_campaign_report(
             f"{_format_metric(_as_float(row.get('total_experiment_time_s')))} |"
         )
 
+
+        lines.extend(
+        [
+            "",
+            "## Run provenance",
+            "",
+            (
+                "Values are read from the exported run metadata. "
+                "Missing provenance is shown as n/a."
+            ),
+            "",
+            "| Run ID | Scenario ID | Campaign ID | Run number |",
+            "|---|---|---|---:|",
+        ]
+    )
+
+    for row in rows:
+        lines.append(
+            "| "
+            f"{_markdown_cell(row.get('run_id'))} | "
+            f"{_markdown_cell(row.get('scenario_id'))} | "
+            f"{_markdown_cell(row.get('campaign_id'))} | "
+            f"{_markdown_cell(row.get('run_number'))} |"
+        )
+
     lines.extend(
         [
             "",
             "## Recovery protocol",
             "",
-            "Each cascade experiment uses a deterministic recovery scenario:",
-            "",
-            "- A first controlled worker termination is injected at iteration 55.",
-            "- The controller restores the latest valid checkpoint, `ckpt_40`.",
-            "- During the first recovery, `ckpt_80` is deliberately corrupted.",
-            "- A second controlled termination is injected at iteration 85.",
-            "- The controller rejects the corrupted `ckpt_80` and restores `ckpt_60`.",
-            "- The final recovery completes at `ckpt_100` and performs integrity and numerical verification.",
+            (
+                "Fault injection and checkpoint corruption are configured "
+                "by the experiment scenario."
+            ),
+            (
+                "Per-run recovery sources are available in the CSV "
+                "`recovery_sources` field. Detailed execution records "
+                "are stored in each run's events.jsonl and summary.json."
+            ),
+            (
+                "This report does not reconstruct the exact fault "
+                "schedule from the aggregated CSV."
+            ),
             "",
             "## Failed runs",
             "",
@@ -576,12 +679,38 @@ def generate_campaign_report(
     )
 
     if failed_run_ids:
-        lines.extend(
-            f"- `{run_id}`"
-            for run_id in failed_run_ids
+        rows_by_id = {
+            row.get("run_id"): row
+            for row in rows
+        }
+
+        lines.append(
+            "Unsuccessful runs may have final_state failed or unsafe."
         )
+        lines.append("")
+
+        for run_id in failed_run_ids:
+            row = rows_by_id.get(str(run_id), {})
+
+            lines.extend(
+                [
+                    f"- `{_markdown_cell(run_id)}`",
+                    (
+                        "  - Final state: "
+                        f"{_markdown_cell(row.get('final_state'))}"
+                    ),
+                    (
+                        "  - Failure phase: "
+                        f"{_markdown_cell(row.get('failure_phase'))}"
+                    ),
+                    (
+                        "  - Failure reason: "
+                        f"{_markdown_cell(row.get('failure_reason'))}"
+                    ),
+                ]
+            )
     else:
-        lines.append("No failed runs were recorded.")
+        lines.append("No failed runs were recorded.")    
 
     lines.append("")
 

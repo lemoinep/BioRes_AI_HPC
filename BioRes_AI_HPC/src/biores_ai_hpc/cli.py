@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from math import isfinite
+from dataclasses import asdict
 from pathlib import Path
 import subprocess
 from time import perf_counter
@@ -253,6 +255,13 @@ def run_scenario(
         run_id=run_id,
         checkpoint_root=Path("results/checkpoints"),
         residual_threshold=scenario.worker.residual_threshold,
+        scenario_snapshot=asdict(scenario),
+        run_metadata={
+            "scenario_id": scenario.scenario_id,
+            "campaign_id": campaign_id,
+            "run_number": run_number,
+            "scenario_source": str(config.resolve()),
+        },
     )
 
 
@@ -501,7 +510,7 @@ def run_failure(
         raise typer.Exit(code=3)
 
 
-@app.command(name="run-cascade")
+
 def run_cascade(
      *,
     worker: Path,
@@ -513,6 +522,8 @@ def run_cascade(
     run_id: str,
     checkpoint_root: Path = Path("results/checkpoints"),
     residual_threshold: float = 0.01,
+    scenario_snapshot: dict[str, Any] | None = None,
+    run_metadata: dict[str, Any] | None = None,
 ) -> None:
     """Inject two failures and recover from persistent verified checkpoints."""
     if not worker.exists():
@@ -568,6 +579,29 @@ def run_cascade(
 
     event_logger = JsonlEventLogger(Path("results/runs"), run_id)
 
+    if event_logger.path.exists() and event_logger.path.stat().st_size > 0:
+        raise typer.BadParameter(
+            f"Run already contains events: {run_id}. "
+            "Use a new run ID or explicitly clean the existing artifacts."
+        )
+
+    snapshot_filename: str | None = None
+
+    if scenario_snapshot is not None:
+        snapshot_filename = "scenario_snapshot.json"
+        snapshot_path = event_logger.run_directory / snapshot_filename
+
+        with snapshot_path.open("w", encoding="utf-8") as stream:
+            json.dump(
+                scenario_snapshot,
+                stream,
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
+            stream.write("\n")
+
+
     def log_event(
         event_type: str,
         *,
@@ -596,7 +630,54 @@ def run_cascade(
         first_fail_at=first_fail_at,
         second_fail_at=second_fail_at,
         corrupt_recovery_checkpoint_at=corrupt_recovery_checkpoint_at,
+        residual_threshold=residual_threshold,
+        worker_path=str(worker.resolve()),
+        metadata=dict(run_metadata or {}),
+        scenario=scenario_snapshot,
+        scenario_snapshot_file=snapshot_filename,
     )
+
+
+    def abort_run(
+        reason: str,
+        *,
+        phase: str,
+        attempt_id: int,
+        exit_code: int = 2,
+    ) -> None:
+        elapsed = perf_counter() - experiment_started_at
+
+        log_event(
+            "run_completed",
+            attempt_id=attempt_id,
+            severity="error",
+            final_state=RecoveryState.FAILED.value,
+            failure_reason=reason,
+            failure_phase=phase,
+            recovery_count=recovery_count,
+            final_checkpoint=None,
+            final_checkpoint_attempt=None,
+            final_residual=(
+                final_residual
+                if isfinite(final_residual)
+                else None
+            ),
+            total_recovery_runtime_s=total_recovery_time,
+            total_experiment_time_s=elapsed,
+            verification_time_s=None,
+        )
+
+        summary_path = write_run_summary(event_logger)
+
+        console.print(f"[red]Run failed:[/red] {reason}")
+        console.print(
+            "[green]Run summary written:[/green] "
+            f"{summary_path}"
+        )
+
+        raise typer.Exit(code=exit_code or 1)
+
+
 
     def persist_checkpoint(
         event: dict[str, Any],
@@ -756,20 +837,20 @@ def run_cascade(
         checkpoint = checkpoint_store.latest_valid()
 
         if checkpoint is None:
-            controller.state_machine.transition_to(RecoveryState.FAILED)
-            console.print(
-                f"[red]{phase}: no persistent verified checkpoint is "
-                "available.[/red]"
+            abort_run(
+                "No persistent verified checkpoint is available.",
+                phase=phase,
+                attempt_id=attempt_id,
             )
             return False
 
         state_file = Path(checkpoint.metadata.state_path)
 
         if not state_file.exists():
-            controller.state_machine.transition_to(RecoveryState.FAILED)
-            console.print(
-                f"[red]{phase}: checkpoint state file is missing: "
-                f"{state_file}[/red]"
+            abort_run(
+                f"Checkpoint state file is missing: {state_file}",
+                phase=phase,
+                attempt_id=attempt_id,
             )
             return False
 
@@ -830,21 +911,22 @@ def run_cascade(
 
         if fail_at is None:
             if result.return_code != 0:
-                controller.state_machine.transition_to(RecoveryState.FAILED)
-                console.print(
-                    f"[red]{phase}: final recovery worker failed with "
-                    f"exit code {result.return_code}.[/red]"
+                abort_run(
+                    "Final recovery worker failed with "
+                    f"exit code {result.return_code}.",
+                    phase=phase,
+                    attempt_id=attempt_id,
                 )
-                return False
+
             return True
 
         if result.return_code != 42:
-            controller.state_machine.transition_to(RecoveryState.FAILED)
-            console.print(
-                f"[red]{phase}: expected fault code 42, observed "
-                f"{result.return_code}.[/red]"
+            abort_run(
+                "Expected fault code 42, observed "
+                f"{result.return_code}.",
+                phase=phase,
+                attempt_id=attempt_id,
             )
-            return False
 
         console.print(
             f"[yellow]{phase}: worker exited with expected fault "
@@ -864,33 +946,34 @@ def run_cascade(
     )
 
     if initial_run.return_code != 42:
-        console.print(
-            "[red]Initial run did not terminate with expected fault code 42. "
-            f"Observed: {initial_run.return_code}[/red]"
+        abort_run(
+            "Initial worker did not terminate with expected fault "
+            f"code 42. Observed: {initial_run.return_code}.",
+            phase="initial",
+            attempt_id=0,
+            exit_code=initial_run.return_code or 1,
         )
-        raise typer.Exit(code=initial_run.return_code or 1)
 
     console.print(
         "[yellow]Initial worker exited with expected fault code 42.[/yellow]"
     )
 
-    if not recover_from_latest_checkpoint(
+    recover_from_latest_checkpoint(
         phase="First recovery",
         observer=observe_first_recovery,
         fail_at=second_fail_at,
         corrupt_checkpoint_at=corrupt_recovery_checkpoint_at,
         attempt_id=1,
-    ):
-        raise typer.Exit(code=2)
+    )
 
-    if not recover_from_latest_checkpoint(
+    recover_from_latest_checkpoint(
         phase="Second recovery",
         observer=observe_second_recovery,
         fail_at=None,
         corrupt_checkpoint_at=None,
         attempt_id=2,
-    ):
-        raise typer.Exit(code=2)
+    )
+   
 
     verification_started_at = perf_counter()
 
@@ -904,6 +987,7 @@ def run_cascade(
     )
 
 
+
     verification_elapsed = perf_counter() - verification_started_at
     total_elapsed = perf_counter() - experiment_started_at
 
@@ -914,6 +998,7 @@ def run_cascade(
         state=controller.state.value,
     )
 
+    
     log_event(
         "run_completed",
         severity=(
@@ -922,6 +1007,16 @@ def run_cascade(
             else "error"
         ),
         final_state=controller.state.value,
+        failure_reason=(
+            verification_result.message
+            if controller.state != RecoveryState.VERIFIED
+            else None
+        ),
+        failure_phase=(
+            "final_verification"
+            if controller.state != RecoveryState.VERIFIED
+            else None
+        ),
         recovery_count=recovery_count,
         final_checkpoint=(
             latest_checkpoint.metadata.checkpoint_id
@@ -933,12 +1028,15 @@ def run_cascade(
             if latest_checkpoint is not None
             else None
         ),
-        final_residual=final_residual,
+        final_residual=(
+            final_residual
+            if isfinite(final_residual)
+            else None
+        ),
         total_recovery_runtime_s=total_recovery_time,
         total_experiment_time_s=total_elapsed,
         verification_time_s=verification_elapsed,
     )
-
 
     summary_path = write_run_summary(event_logger)
 
