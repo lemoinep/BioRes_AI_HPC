@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# CMake build outputs
+/build/
+/build-ci-check/
+
+# Generated experiment artifacts
+/results/
+/ckpt_*.state

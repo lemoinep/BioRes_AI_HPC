@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-tests:
+    name: Windows / Python 3.12
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: BioRes_AI_HPC
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          python -m pip install -e ".[dev]"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Configure C++ worker
+        run: cmake -S . -B build -A x64
+
+      - name: Build C++ worker
+        run: cmake --build build --config Release --target biores_worker
+
+      - name: Require compiled worker
+        run: |
+          $worker = ".\build\cpp\Release\biores_worker.exe"
+
+          if (-not (Test-Path $worker -PathType Leaf)) {
+              throw "Compiled C++ worker not found: $worker"
+          }
+
+      - name: Check CLI startup
+        run: |
+          biores --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          biores run-scenario --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          biores run-cascade --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run test suite
+        run: python -m pytest -q -ra
