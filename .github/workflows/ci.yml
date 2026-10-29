@@ -63,3 +63,114 @@ jobs:
 
       - name: Run test suite
         run: python -m pytest -q -ra
+
+      - name: Verify successful cascade recovery
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $campaignId = "ci-positive-${{ github.run_id }}-${{ github.run_attempt }}"
+          $runId = "${campaignId}-run-01"
+
+          biores run-scenario `
+              --config .\configs\cascade_single_run.json `
+              --campaign-id $campaignId `
+              --run-number 1 `
+              --worker .\build\cpp\Release\biores_worker.exe
+
+          $scenarioExitCode = $LASTEXITCODE
+
+          if ($scenarioExitCode -ne 0) {
+              throw "Positive scenario returned $scenarioExitCode; expected 0."
+          }
+
+          $summaryPath = ".\results\runs\$runId\summary.json"
+
+          if (-not (Test-Path $summaryPath -PathType Leaf)) {
+              throw "Missing run summary: $summaryPath"
+          }
+
+          $summary = Get-Content $summaryPath -Raw | ConvertFrom-Json
+
+          if ($summary.success -ne $true -or $summary.final_state -ne "verified") {
+              throw "Positive scenario did not reach verified success."
+          }
+
+          if ($summary.fault_count -ne 2 -or $summary.recovery_count -ne 2) {
+              throw "Expected two injected faults and two recoveries."
+          }
+
+          if ($summary.invalid_checkpoint_count -ne 1) {
+              throw "Expected one invalid checkpoint."
+          }
+
+          if ($summary.final_checkpoint.checkpoint_id -ne "ckpt_100") {
+              throw "Expected final checkpoint ckpt_100."
+          }
+
+          Write-Host "Positive control passed: verified recovery."
+          exit 0
+
+      - name: Verify numerical rejection
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $campaignId = "ci-negative-${{ github.run_id }}-${{ github.run_attempt }}"
+          $runId = "${campaignId}-run-01"
+
+          biores run-scenario `
+              --config .\configs\cascade_numerical_rejection.json `
+              --campaign-id $campaignId `
+              --run-number 1 `
+              --worker .\build\cpp\Release\biores_worker.exe
+
+          $scenarioExitCode = $LASTEXITCODE
+
+          if ($scenarioExitCode -ne 2) {
+              throw "Negative scenario returned $scenarioExitCode; expected 2."
+          }
+
+          $summaryPath = ".\results\runs\$runId\summary.json"
+
+          if (-not (Test-Path $summaryPath -PathType Leaf)) {
+              throw "Missing run summary: $summaryPath"
+          }
+
+          $summary = Get-Content $summaryPath -Raw | ConvertFrom-Json
+
+          if ($summary.success -ne $false -or $summary.final_state -ne "unsafe") {
+              throw "Negative scenario did not reach unsafe rejection."
+          }
+
+          if ($summary.failure_phase -ne "final_verification") {
+              throw "Rejection did not occur during final verification."
+          }
+
+          if ($summary.failure_reason -notmatch "numerical_residual") {
+              throw "Rejection reason does not identify numerical_residual."
+          }
+
+          if ($summary.fault_count -ne 2 -or $summary.recovery_count -ne 2) {
+              throw "Expected two injected faults and two recoveries."
+          }
+
+          if ($summary.invalid_checkpoint_count -ne 1) {
+              throw "Expected one invalid checkpoint."
+          }
+
+          if ($summary.final_checkpoint.checkpoint_id -ne "ckpt_100") {
+              throw "Expected completed calculation at ckpt_100."
+          }
+
+          $residual = $summary.metrics.final_residual
+          $threshold = $summary.scenario.worker.residual_threshold
+
+          if ($null -eq $residual -or $null -eq $threshold) {
+              throw "Missing numerical residual or configured threshold."
+          }
+
+          if ($residual -le $threshold) {
+              throw "Expected the final residual to exceed the threshold."
+          }
+
+          Write-Host "Negative control passed: numerical result correctly rejected."
+          exit 0
