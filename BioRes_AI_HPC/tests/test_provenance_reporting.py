@@ -125,3 +125,83 @@ def test_provenance_and_failure_details_reach_report(
         else:
             assert "Failure phase: n/a" in report
             assert "Failure reason: n/a" in report
+
+
+def test_report_keeps_multiple_runs_in_separate_tables(tmp_path) -> None:
+    runs_root = tmp_path / "runs"
+    run_ids = [f"campaign-test-run-{number:02d}" for number in range(1, 4)]
+
+    for number, run_id in enumerate(run_ids, start=1):
+        run_directory = runs_root / run_id
+        run_directory.mkdir(parents=True)
+
+        summary = {
+            "schema_version": 1,
+            "run_id": run_id,
+            "success": True,
+            "final_state": "verified",
+            "fault_count": 2,
+            "recovery_count": 2,
+            "invalid_checkpoint_count": 1,
+            "metadata": {
+                "scenario_id": "cascade_test",
+                "campaign_id": "campaign-test",
+                "run_number": number,
+            },
+            "metrics": {
+                "total_experiment_time_s": 5.0,
+                "total_recovery_runtime_s": 3.0,
+                "verification_time_s": 0.01,
+            },
+        }
+
+        (run_directory / "summary.json").write_text(
+            json.dumps(summary),
+            encoding="utf-8",
+        )
+
+    csv_path = tmp_path / "runs.csv"
+    campaign_path = tmp_path / "campaign.json"
+    report_path = tmp_path / "report.md"
+
+    export_run_summaries_csv(runs_root, csv_path)
+    analyze_run_summaries_csv(csv_path, campaign_path)
+    generate_campaign_report(csv_path, campaign_path, report_path)
+
+    report = report_path.read_text(encoding="utf-8")
+
+    assert report.splitlines().count("## Run results") == 1
+    assert report.splitlines().count("## Run provenance") == 1
+
+    results_section = report.split("## Run results\n", 1)[1].split(
+        "## Run provenance\n", 1
+    )[0]
+    provenance_section = report.split("## Run provenance\n", 1)[1].split(
+        "## Recovery protocol\n", 1
+    )[0]
+
+    result_rows = [
+        line
+        for line in results_section.splitlines()
+        if line.startswith("| campaign-test-run-")
+    ]
+    provenance_rows = [
+        line
+        for line in provenance_section.splitlines()
+        if line.startswith("| campaign-test-run-")
+    ]
+
+    assert len(result_rows) == 3
+    assert len(provenance_rows) == 3
+
+    for number, run_id in enumerate(run_ids, start=1):
+        assert any(
+            line.startswith(f"| {run_id} | True | verified |")
+            for line in result_rows
+        )
+        assert (
+            f"| {run_id} | cascade_test | campaign-test | {number} |"
+        ) in provenance_rows
+
+    assert all(line.count("|") == 10 for line in result_rows)
+    assert all(line.count("|") == 5 for line in provenance_rows)

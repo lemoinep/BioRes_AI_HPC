@@ -629,8 +629,7 @@ def generate_campaign_report(
             f"{_format_metric(_as_float(row.get('total_experiment_time_s')))} |"
         )
 
-
-        lines.extend(
+    lines.extend(
         [
             "",
             "## Run provenance",
