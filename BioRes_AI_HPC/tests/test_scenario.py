@@ -1,4 +1,6 @@
+from pathlib import Path
 import pytest
+
 
 from biores_ai_hpc.scenario import (
     ScenarioConfigError,
@@ -121,3 +123,26 @@ def test_zero_residual_threshold_is_rejected(tmp_path) -> None:
 
     with pytest.raises(ScenarioConfigError):
         load_scenario_config(config_path)
+
+
+def test_load_numerical_rejection_scenario() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    config_path = (
+        project_root / "configs" / "cascade_numerical_rejection.json"
+    )
+
+    config = load_scenario_config(config_path)
+
+    assert config.schema_version == 1
+    assert config.scenario_id == "cascade_numerical_rejection"
+    assert config.worker.iterations == 100
+    assert config.worker.checkpoint_interval == 20
+    assert config.worker.first_fail_at == 55
+    assert config.worker.second_fail_at == 85
+    assert config.worker.corrupt_recovery_checkpoint_at == 80
+    assert config.worker.residual_threshold == pytest.approx(0.001)
+    assert config.campaign.run_count == 1
+    assert (
+        config.campaign.run_id_template
+        == "{campaign_id}-run-{run_number:02d}"
+    )

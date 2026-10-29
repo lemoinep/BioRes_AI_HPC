@@ -193,32 +193,3 @@ def _parse_campaign_scenario(raw: dict[str, Any]) -> CampaignScenario:
         run_count=run_count,
         run_id_template=run_id_template,
     )
-
-
-def test_zero_residual_threshold_is_rejected(tmp_path) -> None:
-    config_path = tmp_path / "invalid_threshold.json"
-
-    config_path.write_text(
-        """
-        {
-          "schema_version": 1,
-          "scenario_id": "invalid_threshold",
-          "worker": {
-            "iterations": 100,
-            "checkpoint_interval": 20,
-            "first_fail_at": 55,
-            "second_fail_at": 85,
-            "corrupt_recovery_checkpoint_at": 80,
-            "residual_threshold": 0
-          },
-          "campaign": {
-            "run_count": 1,
-            "run_id_template": "{campaign_id}-run-{run_number:02d}"
-          }
-        }
-        """,
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ScenarioConfigError):
-        load_scenario_config(config_path)
