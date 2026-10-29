@@ -1,2 +1,0 @@
-[console_scripts]
-biores = biores_ai_hpc.cli:app
