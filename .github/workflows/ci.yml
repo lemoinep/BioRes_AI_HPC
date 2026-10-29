@@ -174,3 +174,19 @@ jobs:
 
           Write-Host "Negative control passed: numerical result correctly rejected."
           exit 0
+
+
+      - name: Upload recovery validation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: recovery-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ github.workspace }}/BioRes_AI_HPC/results/runs/ci-positive-${{ github.run_id }}-${{ github.run_attempt }}-run-01/events.jsonl
+            ${{ github.workspace }}/BioRes_AI_HPC/results/runs/ci-positive-${{ github.run_id }}-${{ github.run_attempt }}-run-01/summary.json
+            ${{ github.workspace }}/BioRes_AI_HPC/results/runs/ci-positive-${{ github.run_id }}-${{ github.run_attempt }}-run-01/scenario_snapshot.json
+            ${{ github.workspace }}/BioRes_AI_HPC/results/runs/ci-negative-${{ github.run_id }}-${{ github.run_attempt }}-run-01/events.jsonl
+            ${{ github.workspace }}/BioRes_AI_HPC/results/runs/ci-negative-${{ github.run_id }}-${{ github.run_attempt }}-run-01/summary.json
+            ${{ github.workspace }}/BioRes_AI_HPC/results/runs/ci-negative-${{ github.run_id }}-${{ github.run_attempt }}-run-01/scenario_snapshot.json
+          if-no-files-found: warn
+          retention-days: 14
